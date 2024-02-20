@@ -15,10 +15,20 @@ bot = telebot.TeleBot(config.TOKEN)
 # bot.polling(none_stop=True)
 
 recommend_tickers = [
-    "FRT - Bán lẻ FPT",
-    "PNJ - Vàng Phú Nhuận",
-    "VRE - Vincom Retail",
+    "CTCP Bán lẻ Kỹ thuật số FPT (FRT)",
+    "CTCP Vàng bạc Đá quý Phú Nhuận (PNJ)",
+    "CTCP Đầu tư Thế giới Di động (MWG)",
+    "CTCP G-Automobile (GMA)",
+    "CTCP City Auto (CAV)",
+    "CTCP Cảng Sài Gòn (SGC)",
+    "CTCP Cảng Đồng Nai (PDN)",
+    "CTCP Gemadept (GMD)",
+    "CTCP Cảng Cát Lái (CLL)",
+    "CTCP Vận tải và Xếp dỡ Hải An (HAH)",
 ]
+
+recommend_tickers_short = \
+    [ticker.split()[-1].strip()[1:-1] for ticker in recommend_tickers]
 
 # message_ids = []  # contain history chatlog
 current_ticker = ""
@@ -34,19 +44,24 @@ def reset_chatlog():  # Reset chatlog and initialize new chatbot
 def start_command(message):
     reset_chatlog()
     chat_id = message.chat.id
-    telebot_send_message(bot, chat_id,
-                         "Xin chào! Tôi là chatbot tư vấn được phát triển bởi ACB để hỗ trợ bạn trong việc tìm hiểu về các doanh nghiệp và thông tin liên quan.")
-    telebot_send_message(bot, chat_id,
-                         "Tôi có thể cung cấp tư vấn và đánh giá liệu rằng một doanh nghiệp có đáp ứng đủ các tiêu chí để sử dụng các dịch vụ từ ACB hay không, như vay tín dụng, tài chính, và các dịch vụ khác.")
-    telebot_send_message(bot, chat_id,
-                         "Bằng việc sử dụng trí thông minh nhân tạo và cơ sở dữ liệu rộng lớn, tôi sẽ cố gắng cung cấp cho bạn những thông tin chính xác và hữu ích nhất có thể để giúp bạn đưa ra quyết định thông minh về việc hợp tác kinh doanh với các doanh nghiệp.")
     # Recommend some tickers for user
     keyboard = telebot.types.InlineKeyboardMarkup()
     for ticker in recommend_tickers:
-        keyboard.row(telebot.types.InlineKeyboardButton(ticker, callback_data=f"get-{ticker.split('-')[0].strip()}"))
+        keyboard.row(telebot.types.InlineKeyboardButton(ticker, callback_data=f"get-{ticker.split()[-1].strip()[1:-1]}"))
     
     telebot_send_message(bot, chat_id,
-                         "Xin vui lòng cho tôi mã hoặc tên doanh nghiệp, tổ chức để tôi có thể hỗ trợ tư vấn cho bạn",
+                         """Xin chào! Tôi là VNPT FinAssist, trợ lý ảo chuyên cung cấp giải pháp toàn diện cho việc đánh giá và cấp tín dụng doanh nghiệp. Hiện tại, VNPT FinAssist đang hỗ trợ phân tích các doanh nghiệp sau:
+1. CTCP Bán lẻ Kỹ thuật số FPT (FRT)
+2. CTCP Vàng bạc Đá quý Phú Nhuận (PNJ)
+3. CTCP Đầu tư Thế giới Di động (MWG)
+4. CTCP G-Automobile (GMA)
+5. CTCP City Auto (CAV)
+6. CTCP Cảng Sài Gòn (SGC)
+7. CTCP Cảng Đồng Nai (PDN)
+8. CTCP Gemadept (GMD)
+9. CTCP Cảng Cát Lái (CLL)
+10. CTCP Vận tải và Xếp dỡ Hải An (HAH)
+Hãy nhập mã ticker doanh nghiệp bạn muốn tìm hiểu để tôi có thể hỗ trợ bạn ngay nhé!""",
                          reply_markup=keyboard)
 
 # Click handler
@@ -58,7 +73,7 @@ def iq_callback(query):
     if data.startswith("get-"):  # infos for specific ticker
         if current_ticker == "":
             ticker = data[4:]
-            ticker, organ_name, organ_short_name = check_organ(ticker)
+            ticker, organ_name, organ_short_name = check_organ(ticker, recommend_tickers_short)
             current_ticker = ticker
             current_organ_name = organ_name
 
@@ -66,6 +81,9 @@ def iq_callback(query):
             telebot_send_message(bot, chat_id,
                          f"Thông tin cần tư vấn: **{ticker} - {organ_name} - {organ_short_name}**")
             initialize_knowledges(bot, chat_id, ticker, organ_name)
+            # Finish with the recommend helpful assistance option for user
+            telebot_send_message(bot, chat_id,
+                                "Hy vọng các thông tin và phân tích VNPT FinAssist vừa cung cấp có hữu ích với bạn. Nếu bạn còn thắc mắc hoặc muốn tôi phân tích một doanh nghiệp khác, đừng ngần ngại đặt câu hỏi cho VNPT FinAssist nhé!")
         else:
             telebot_send_message(bot, chat_id,
                          f"Bạn đang hỏi tư vấn thông tin của **{current_ticker} - {current_organ_name}**. Nếu bạn muốn hỏi thông tin về doanh nghiệp, tổ chức khác, xin vui lòng nhập lệnh /start để làm mới quá trình tư vấn ạ!")
@@ -77,12 +95,14 @@ def handle_text_input(message):
     text = message.text
     chat_id = message.chat.id
     if current_ticker == "":
-        result = check_organ(text.strip())
+        result = check_organ(text.strip(), recommend_tickers_short)
         if result is None:
+            keyboard = telebot.types.InlineKeyboardMarkup()
+            for ticker in recommend_tickers:
+                keyboard.row(telebot.types.InlineKeyboardButton(ticker, callback_data=f"get-{ticker.split()[-1].strip()[1:-1]}"))
             telebot_send_message(bot, chat_id,
-                         f"Xin lỗi bạn nhưng có vẻ thông tin về doanh nghiệp **{text.strip()}** không có trong cơ sở dữ liệu của tôi, bạn có thể kiểm tra lại thông tin mã doanh nghiệp, tổ chức hoặc tôi có thể giúp bạn tư vấn thông tin doanh nghiệp, tổ chức khác không?")
-            telebot_send_message(bot, chat_id,
-                         "Bạn có thể xem thêm thông tin mã doanh nghiệp, tổ chức tại [link](https://eodhd.com/exchange/VN)")
+                         f"""Xin lỗi, tôi chưa có thông tin về doanh nghiệp **{text.strip()}** trong cơ sở dữ liệu của mình. Bạn có muốn tìm hiểu về doanh nghiệp nào khác không?""",
+                         reply_markup=keyboard)
             return
         else:
             ticker, organ_name, organ_short_name = result
@@ -92,6 +112,9 @@ def handle_text_input(message):
             telebot_send_message(bot, chat_id,
                          f"Thông tin cần tư vấn: **{ticker} - {organ_name} - {organ_short_name}**")
             initialize_knowledges(bot, ticker)
+            # Finish with the recommend helpful assistance option for user
+            telebot_send_message(bot, chat_id,
+                                "Hy vọng các thông tin và phân tích VNPT FinAssist vừa cung cấp có hữu ích với bạn. Nếu bạn còn thắc mắc hoặc muốn tôi phân tích một doanh nghiệp khác, đừng ngần ngại đặt câu hỏi cho VNPT FinAssist nhé!")
 
 
 bot.infinity_polling()

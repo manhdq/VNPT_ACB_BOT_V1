@@ -4,7 +4,7 @@ import os
 import pandas as pd
 import warnings
 from PIL import Image, ImageDraw, ImageFont
-from functools import wraps
+from tenacity import retry, wait_random_exponential, stop_after_attempt
 
 import google.generativeai as genai
 from telegram import ChatAction
@@ -13,7 +13,7 @@ from vnstock import * #import all functions
 from utils import to_lower, to_upper
 from vnstock_helper import parse_ratios
 
-GOOGLE_API_KEY=""
+GOOGLE_API_KEY=os.environ["GOOGLE_API_KEY"]
 genai.configure(api_key=GOOGLE_API_KEY)
 
 generation_config=genai.types.GenerationConfig(
@@ -25,6 +25,11 @@ generation_config=genai.types.GenerationConfig(
 
 model = genai.GenerativeModel('gemini-pro', generation_config=generation_config)
 passage_cache = ""  # Save time when generate answer 2 and 3
+
+
+# @retry(wait=wait_random_exponential(min=1, max=40), stop=stop_after_attempt(3))
+def get_completion(prompt):
+    return model.generate_content(prompt)
 
 
 df_list = listing_companies()
@@ -39,7 +44,7 @@ organ_short_name_list = df_list.organShortName.tolist()
 organ_short_name_list = list(map(to_lower, organ_short_name_list))
 
 
-def check_organ(name):
+def check_organ(name, stricted_tickers=[]):
     # If name is ticker and exist
     if name.lower() in ticker_list:
         id = ticker_list.index(name.lower())
@@ -50,6 +55,9 @@ def check_organ(name):
     else:
         return None
     row = df_list.iloc[id]
+    if len(stricted_tickers) > 0:
+        if row.ticker not in stricted_tickers:
+            return None
     return row.ticker, row.organName, row.organShortName
 
 
@@ -124,7 +132,7 @@ def generate_answer_1(ticker):
 
     Thông tin doanh nghiệp:
     {passage}"""
-    response = model.generate_content(prompt)
+    response = get_completion(prompt)
 
     return response.text
 
@@ -145,7 +153,7 @@ Yêu cầu báo cáo chuyên nghiệp và chi tiết, làm cơ sở để hỗ t
 
     Thông tin doanh nghiệp:
     {passage_cache}"""
-    response = model.generate_content(prompt)
+    response = get_completion(prompt)
 
     return response.text
 
@@ -178,7 +186,7 @@ Thông tin doanh nghiệp:
 
 {ACB_CRITERIA}
 """
-    response = model.generate_content(prompt)
+    response = get_completion(prompt)
 
     passage_cache = ""  # Naive reset
 
