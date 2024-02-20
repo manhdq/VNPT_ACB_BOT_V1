@@ -13,7 +13,7 @@ from vnstock import * #import all functions
 from utils import to_lower, to_upper
 from vnstock_helper import parse_ratios
 
-GOOGLE_API_KEY="AIzaSyBRc0cacOVzHcoyqBUI-_Q_7wbHbuvy7VY"
+GOOGLE_API_KEY=""
 genai.configure(api_key=GOOGLE_API_KEY)
 
 generation_config=genai.types.GenerationConfig(
