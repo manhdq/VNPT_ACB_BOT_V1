@@ -1,0 +1,6 @@
+python-telegram-bot==4.1.1
+google-generativeai
+bs4
+vnstock
+telebot
+markdown2
