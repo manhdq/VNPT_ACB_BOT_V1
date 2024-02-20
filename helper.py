@@ -3,6 +3,8 @@ import re
 import os
 import pandas as pd
 import warnings
+import matplotlib.pyplot as plt
+import dataframe_image as dfi
 from PIL import Image, ImageDraw, ImageFont
 from tenacity import retry, wait_random_exponential, stop_after_attempt
 
@@ -205,6 +207,7 @@ def table_to_image(table_str, index=0):
 
 
 def reformat_table(text):
+    os.makedirs("cache", exist_ok=True)
     def find_tables_with_indices(text):
         # Define a regular expression pattern for identifying tables
         table_pattern = re.compile(r'\|.*\|')
@@ -214,7 +217,7 @@ def reformat_table(text):
 
         return matches
     
-    def beautify_table(table_string):
+    def beautify_table_saving(table_string, index):
         lines = table_string.strip().split("\n")
         # Extract header and data rows
         header = [col.strip() for col in lines[0].split('|')[1:-1]]
@@ -226,14 +229,12 @@ def reformat_table(text):
         for row in data:
             values = [col.strip() for col in row.split('|')[1:-1]]
             for i, val in enumerate(values):
+                val = val.replace("&gt;", ">")
+                val = val.replace("&lt;", "<")
                 table_dict[id2col[i]].append(val)
-
+        
         df = pd.DataFrame(table_dict)
-
-        # Convert DataFrame to Markdown table
-        markdown_table = df.to_markdown(index=False)
-
-        return markdown_table
+        dfi.export(df, f'cache/table_{index}.jpg')
     
     start_index_parts = []
     table_parts = []
@@ -266,12 +267,9 @@ def reformat_table(text):
             table += "\n" + next_table_part
     tables.append(table)
 
-    reformat_tables = [beautify_table(tab) for tab in tables]
-
-    for i, re_tab in enumerate(reformat_tables):
-        re_tab = re_tab.replace("&gt;", ">")
-        re_tab = re_tab.replace("&lt;", "<")
-        table_to_image(re_tab, i)
+    for i, tab in enumerate(tables):
+        beautify_table_saving(tab, i)
+        
     return text, len(start_indices)
 
 

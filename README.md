@@ -12,7 +12,7 @@ export GOOGLE_API_KEY="AIzaSyBRc0cacOVzHcoyqBUI-_Q_7wbHbuvy7VY"
 
 `config.py: line 2` - Key of telebot
 ```
-export TELE_TOKEN = "6740442101:AAH4FTUwE1i1sLJ2EtidSaO3sK6HqHTmg1A"
+export TELE_TOKEN="6740442101:AAH4FTUwE1i1sLJ2EtidSaO3sK6HqHTmg1A"
 ```
 
 ## Step 3: Run Backend for Telebot to start conversation
