@@ -1,11 +1,20 @@
 # -*- coding: utf-8 -*-
 import telebot
 import config
+import requests
+import json
 import pytz
 
 from helper import check_organ, initialize_knowledges, \
-                telebot_send_message
+                telebot_send_message, ACBAssistant
 
+
+# Retrieval options  ##TODO: Dynamic this
+RETRIEVAL_API_ENDPOINT = "http://10.159.19.19:30814/search"
+RETRIEVAL_BOT_ID = "9b5f31a0-cfc8-11ee-b261-e75ac6d5ebdf"
+RETRIEVAL_TOP_N_RETRIEVAL = "50"
+RETRIEVAL_TOP_N_RERANKING = "5"
+RETRIEVAL_RANK = "0"
 
 P_TIMEZONE = pytz.timezone(config.TIMEZONE)
 TIMEZONE_COMMON_NAME = config.TIMEZONE_COMMON_NAME
@@ -13,6 +22,9 @@ TIMEZONE_COMMON_NAME = config.TIMEZONE_COMMON_NAME
 # Create a bot given token
 bot = telebot.TeleBot(config.TOKEN)
 # bot.polling(none_stop=True)
+
+# Create a ACB Assistant
+acb_assistant = ACBAssistant()
 
 recommend_tickers = [
     "CTCP Bán lẻ Kỹ thuật số FPT (FRT)",
@@ -80,7 +92,10 @@ def iq_callback(query):
             bot.answer_callback_query(query.id)
             telebot_send_message(bot, chat_id,
                          f"Thông tin cần tư vấn: **{ticker} - {organ_name} - {organ_short_name}**")
-            initialize_knowledges(bot, chat_id, ticker, organ_name)
+            base_knowledges_dict = initialize_knowledges(bot, chat_id, ticker, organ_name)
+
+            acb_assistant.setup_base_knowledges(base_knowledges_dict)  # Setup base knowledges for acb assistant
+
             # Finish with the recommend helpful assistance option for user
             telebot_send_message(bot, chat_id,
                                 "Hy vọng các thông tin và phân tích VNPT FinAssist vừa cung cấp có hữu ích với bạn. Nếu bạn còn thắc mắc hoặc muốn tôi phân tích một doanh nghiệp khác, đừng ngần ngại đặt câu hỏi cho VNPT FinAssist nhé!")
@@ -95,6 +110,7 @@ def handle_text_input(message):
     text = message.text
     chat_id = message.chat.id
     if current_ticker == "":
+        # If not any ticker selected yet
         result = check_organ(text.strip(), recommend_tickers_short)
         if result is None:
             keyboard = telebot.types.InlineKeyboardMarkup()
@@ -111,10 +127,35 @@ def handle_text_input(message):
 
             telebot_send_message(bot, chat_id,
                          f"Thông tin cần tư vấn: **{ticker} - {organ_name} - {organ_short_name}**")
-            initialize_knowledges(bot, ticker)
+            base_knowledges_dict = initialize_knowledges(bot, ticker)
+            
+            acb_assistant.setup_base_knowledges(base_knowledges_dict)  # Setup base knowledges for acb assistant
+
             # Finish with the recommend helpful assistance option for user
             telebot_send_message(bot, chat_id,
                                 "Hy vọng các thông tin và phân tích VNPT FinAssist vừa cung cấp có hữu ích với bạn. Nếu bạn còn thắc mắc hoặc muốn tôi phân tích một doanh nghiệp khác, đừng ngần ngại đặt câu hỏi cho VNPT FinAssist nhé!")
+    else:
+        ##### Solve follow-up QA here #####
+        # If there is ticker selected
+        ##TODO: Debugging
+        api_input = {
+            "bot_id": RETRIEVAL_BOT_ID,
+            "query": text,
+            "top_n_retrieval": RETRIEVAL_TOP_N_RETRIEVAL,
+            "top_n_reranking": RETRIEVAL_TOP_N_RERANKING,
+            "rank": RETRIEVAL_RANK
+        }
+        retrieval_response = requests.post(RETRIEVAL_API_ENDPOINT, json=api_input)
+        assert retrieval_response.status_code == 200
+        retrieval_response = retrieval_response.json()
+        retrieval_response =retrieval_response["knowledge_retrieval"]
+
+        # # Dummy response  ##TODO: Delete this
+        # with open("retrieval_response.json", "r") as f:
+        #     retrieval_response = json.load(f)["knowledge_retrieval"]
+
+        answer = acb_assistant.request_answer(text, retrieval_response, use_base_knowledges=False)
+        telebot_send_message(bot, chat_id, answer)
 
 
 bot.infinity_polling()

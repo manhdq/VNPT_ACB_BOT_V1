@@ -220,3 +220,8 @@ def parse_ratios(ticker):
         final_passage = "Không có thông tin về doanh nghiệp"
 
     return final_passage
+
+
+def get_industry_of_ticker(ticker):
+    industry = company_overview(ticker)["industry"][0]
+    return industry

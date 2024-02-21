@@ -13,7 +13,7 @@ from telegram import ChatAction
 from vnstock import * #import all functions
 
 from utils import to_lower, to_upper
-from vnstock_helper import parse_ratios
+from vnstock_helper import parse_ratios, get_industry_of_ticker
 
 GOOGLE_API_KEY=os.environ["GOOGLE_API_KEY"]
 genai.configure(api_key=GOOGLE_API_KEY)
@@ -66,43 +66,51 @@ def check_organ(name, stricted_tickers=[]):
 ##### Generate all pre-knowledges #####
 def initialize_knowledges(bot, chat_id, ticker, organ_name):
     question_list = [
-        f"Phân tích tổng quan về công ty {ticker} - {organ_name}",
-        "Đánh giá tình hình kinh doanh của công ty trong 3 năm gần đây và so sánh với trung bình các công ty trong ngành.",
-        "Đánh giá mức độ phù hợp của doanh nghiệp so với điều kiện cấp tín dụng của ACB",
+        "Phân tích tổng quan về công ty **{0} - {1}**",  # ticker, organ_name
+        "Đánh giá tình hình kinh doanh của công ty **{0} - {1}** trong 3 năm gần đây và so sánh với trung bình các công ty trong ngành **{2}**.",  # ticker, organ_name, industry
+        "Đánh giá mức độ phù hợp của doanh nghiệp **{0} - {1}** so với điều kiện cấp tín dụng của ACB",  # ticker, organ_name
     ]
     base_knowledges_dict = {
 
     }
+    industry = get_industry_of_ticker(ticker)
 
     # QA 1
     telebot_send_message(bot, chat_id,
-                         f"**Q1:** {question_list[0]}")
+                         f"**Q1:** {question_list[0].format(ticker, organ_name)}")
     bot.send_chat_action(chat_id, action=ChatAction.TYPING)
     answer = generate_answer_1(ticker)
     telebot_send_message(bot, chat_id,
                          answer)
-    base_knowledges_dict["Q1"] = question_list[0]
-    base_knowledges_dict["A1"] = answer
+    # base_knowledges_dict["Q1"] = question_list[0]
+    # base_knowledges_dict["A1"] = answer
+    base_knowledges_dict[question_list[0].format(ticker, organ_name)] = answer
 
     # QA 2
     telebot_send_message(bot, chat_id,
-                         f"**Q2:** {question_list[1]}")
+                         f"**Q2:** {question_list[1].format(ticker, organ_name, industry)}")
     bot.send_chat_action(chat_id, action=ChatAction.TYPING)
     answer = generate_answer_2(ticker)
     telebot_send_message(bot, chat_id,
                          answer)
-    base_knowledges_dict["Q2"] = question_list[1]
-    base_knowledges_dict["A2"] = answer
+    # base_knowledges_dict["Q2"] = question_list[1]
+    # base_knowledges_dict["A2"] = answer
+    base_knowledges_dict[question_list[1].format(ticker, organ_name, industry)] = answer
 
     # QA 3
     telebot_send_message(bot, chat_id,
-                         f"**Q3:** {question_list[2]}")
+                         f"**Q3:** {question_list[2].format(ticker, organ_name)}")
     bot.send_chat_action(chat_id, action=ChatAction.TYPING)
     answer = generate_answer_3(ticker)
     telebot_send_message(bot, chat_id,
                          answer)
-    base_knowledges_dict["Q3"] = question_list[2]
-    base_knowledges_dict["A3"] = answer
+    # base_knowledges_dict["Q3"] = question_list[2]
+    # base_knowledges_dict["A3"] = answer
+    base_knowledges_dict[question_list[2].format(ticker, organ_name)] = answer
+
+    # # Save to cache (for debug purpose)  ##TODO: Delete this
+    # with open("cache_kl_base.json", "w") as f:
+    #     json.dump(base_knowledges_dict, f, indent=4)
 
     return base_knowledges_dict
 
@@ -308,3 +316,72 @@ def telebot_send_message(bot, chat_id, message, reply_markup=None):
                     chat_id,
                     photo
                 )
+
+
+class ACBAssistant:
+    def __init__(self, base_knowledges=dict()):
+        # TODO: Dynamic the prompt by config file
+        self.system_guide = """Bạn là VNPT FinAssist, trợ lý ảo chuyên cung cấp giải pháp toàn diện cho việc đánh giá và cấp tín dụng doanh nghiệp.
+Hãy dựa vào các đoạn văn dưới đây để đưa ra hỗ trợ đánh giá và cấp tín dụng doanh nghiệp, giải đáp câu hỏi của người dùng. Bạn sẽ gọi người dùng là \"bạn\".
+<lời tư vấn chi tiết, chuyên nghiệp dựa trên câu hỏi>
+
+Lưu ý:
+    - Chỉ sử dụng thông tin trong các đoạn văn để trả lời.
+    - Không được sử dụng những cụm từ như ""theo đoạn văn"", ""trong đoạn văn"",... trong câu trả lời cuối cùng
+    - Hạn chế sáng tạo ra các nội dung mới không có trong các đoạn văn trong câu trả lời cuối cùng.
+    - Nếu không có thông tin trong các đoạn văn để trả lời câu hỏi, hãy viết ""xin lỗi, hiện tại tôi không có đủ thông tin để trả lời""
+    - Luôn luôn tư vấn với tông giọng chuyên nghiệp và tận tâm.
+
+Đoạn văn: {}
+Câu hỏi: {}"""
+        self.base_knowledges = base_knowledges
+        self.num_answer_retry = 10  # if answer process error 10 times, return exception
+
+    def setup_system_guide(self, system_guide):
+        self.system_guide = system_guide
+
+    def setup_base_knowledges(self, base_knowledges):
+        if isinstance(base_knowledges, str):  # if is path
+            assert base_knowledges[:-5] == ".json"
+            with open(base_knowledges, "r") as f:
+                base_knowledges = json.load(f)
+        
+        self.base_knowledges = base_knowledges
+
+    def get_answer(self, question, passages, retry_count=0):
+        if retry_count >= self.num_answer_retry:
+            return "xin lỗi, Hiện tại tôi không có đủ thông tin để trả lời câu hỏi này."
+
+        text = self.system_guide.format(passages, question)
+        try:
+            response = model.generate_content(text,
+                                            generation_config=genai.types.GenerationConfig(
+                                                temperature=0.1
+                                            ))
+            text = response.text
+            return text
+        except:
+            return self.get_answer(question, passages, retry_count+1)
+
+    def request_answer(self, question, knowledges, passage_thres=0.5, use_base_knowledges=True):
+        passages = self.process_passages(knowledges, use_base_knowledges, passage_thres)
+        answer = self.get_answer(question, passages)
+        return answer
+
+    def process_passages(self, knowledges, use_base_knowledges=True, passage_thres=0.5):
+        # Filter passages with low score
+        passages = []
+        index = 1
+        for kl in knowledges:
+            # Filter passages with low score
+            if float(kl["score_ranking"]) < passage_thres:
+                continue
+            title = kl["passage_title"]
+            content = kl["passage_content"]
+            passages.append(f"[{index}] Tiêu đề: {title}\nNội dung: {content}")
+            index += 1
+        # Use base_knowledges if activate
+        if use_base_knowledges:
+            for title, content in self.base_knowledges.items():
+                passages.append(f"[{index}] Tiêu đề: {title}\nNội dung: {content}")
+        return "\n\n".join(passages)
