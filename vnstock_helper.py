@@ -22,12 +22,12 @@ def extract_industry_figures(ticker):
     top_tickers = []
 
     for ticker in industry_tickers:
-        df = financial_flow(symbol=ticker, report_type='incomestatement', report_range='yearly', get_all=False)
-        year_0 = '2023' # replace with lastest year function
-        year_1 = '2022'
-        year_2 = '2021'
-
         try:
+            df = financial_flow(symbol=ticker, report_type='incomestatement', report_range='yearly', get_all=False)
+            year_0 = '2023' # replace with lastest year function
+            year_1 = '2022'
+            year_2 = '2021'
+
             revenue_0 = df["revenue"][year_0]
             avg_revenue_0 += revenue_0
             avg_revenue_1 += df["revenue"][year_1]

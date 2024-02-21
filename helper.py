@@ -295,18 +295,32 @@ def telebot_send_message(bot, chat_id, message, reply_markup=None):
     html_message, num_table = convert_to_html(message)
 
     if reply_markup is not None:
-        bot.send_message(
-            chat_id,
-            html_message,
-            parse_mode="HTML",
-            reply_markup=reply_markup
-        )
+        try:
+            bot.send_message(
+                chat_id,
+                html_message,
+                parse_mode="HTML",
+                reply_markup=reply_markup
+            )
+        except:
+            bot.send_message(
+                chat_id,
+                message,
+                reply_markup=reply_markup
+            )
     else:
-        bot.send_message(
-            chat_id,
-            html_message,
-            parse_mode="HTML"
-        )
+        try:
+            bot.send_message(
+                chat_id,
+                html_message,
+                parse_mode="HTML"
+            )
+        except:
+            print(html_message)
+            bot.send_message(
+                chat_id,
+                message
+            )
     if num_table:
         for i in range(num_table):
             with open(f"cache/table_{i}.jpg", "rb") as photo:

@@ -128,7 +128,7 @@ def handle_text_input(message):
 
             telebot_send_message(bot, chat_id,
                          f"Thông tin cần tư vấn: **{ticker} - {organ_name} - {organ_short_name}**")
-            base_knowledges_dict = initialize_knowledges(bot, ticker)
+            base_knowledges_dict = initialize_knowledges(bot, chat_id, ticker, organ_name)
             
             acb_assistant.setup_base_knowledges(base_knowledges_dict)  # Setup base knowledges for acb assistant
 
