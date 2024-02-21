@@ -77,21 +77,27 @@ def extract_industry_figures(ticker):
     return figures, top_5_tickers
 
 def extract_industry_ratios(ticker):
+    def safe_get(df, key):
+        try:
+            return df[key][0]
+        except KeyError:
+            return None
+    
     df = company_fundamental_ratio(symbol=ticker, mode='simplify', missing_pct=0.8)
     try:
         receivableTurnover = 365/float(df["daysReceivable.industryAvgValue"][0])
     except:
         receivableTurnover = None
     ratios = {
-      "roe": df["roe.industryAvgValue"][0],
-      "roa": df["roa.industryAvgValue"][0],
-      "postTaxMargin": df["postTaxMargin.industryAvgValue"][0],
-      "debtOnEquity": df["debtOnEquity.industryAvgValue"][0],
-      "debtOnAsset": df["debtOnAsset.industryAvgValue"][0],
-      "currentPayment": df["currentPayment.industryAvgValue"][0],
-      "ebitOnInterest": df["ebitOnInterest.industryAvgValue"][0],
-      "receivableTurnover": receivableTurnover,
-      "revenueOnWorkCapital": df["revenueOnWorkCapital.industryAvgValue"][0]
+        "roe": safe_get(df, "roe.industryAvgValue"),
+        "roa": safe_get(df, "roa.industryAvgValue"),
+        "postTaxMargin": safe_get(df, "postTaxMargin.industryAvgValue"),
+        "debtOnEquity": safe_get(df, "debtOnEquity.industryAvgValue"),
+        "debtOnAsset": safe_get(df, "debtOnAsset.industryAvgValue"),
+        "currentPayment": safe_get(df, "currentPayment.industryAvgValue"),
+        "ebitOnInterest": safe_get(df, "ebitOnInterest.industryAvgValue"),
+        "receivableTurnover": receivableTurnover, 
+        "revenueOnWorkCapital": safe_get(df, "revenueOnWorkCapital.industryAvgValue")
     }
 
     return ratios
@@ -111,23 +117,29 @@ def extract_ticker_figures(ticker):
     return figures
 
 def extract_ticker_ratios(ticker):
-    df = financial_ratio(symbol=ticker, report_range="yearly", is_all=False).T
+    def safe_get(df, column, index, default=None):
+        try:
+            return df.loc[index, column]
+        except KeyError:
+            return None
+    
+    df = financial_ratio(symbol=ticker, report_range='yearly', is_all=False).T
     ratios = {}
     for year in df.index:
         try:
-            receivableTurnover=365/float(df["daysReceivable"][year])
+            receivableTurnover = 365 / float(df.loc[year, "daysReceivable"])
         except:
             receivableTurnover = None
         item = {
-          "roe": df["roe"][year],
-          "roa": df["roa"][year],
-          "postTaxMargin": df["postTaxMargin"][year],
-          "debtOnEquity": df["debtOnEquity"][year],
-          "debtOnAsset": df["debtOnAsset"][year],
-          "currentPayment": df["currentPayment"][year],
-          "ebitOnInterest": df["ebitOnInterest"][year],
-          "receivableTurnover": receivableTurnover,
-          "revenueOnWorkCapital": df["revenueOnWorkCapital"][year]
+            "roe": safe_get(df, "roe", year),
+            "roa": safe_get(df, "roa", year),
+            "postTaxMargin": safe_get(df, "postTaxMargin", year),
+            "debtOnEquity": safe_get(df, "debtOnEquity", year),
+            "debtOnAsset": safe_get(df, "debtOnAsset", year),
+            "currentPayment": safe_get(df, "currentPayment", year),
+            "ebitOnInterest": safe_get(df, "ebitOnInterest", year),
+            "receivableTurnover": receivableTurnover,
+            "revenueOnWorkCapital": safe_get(df, "revenueOnWorkCapital", year)
         }
         ratios[str(year)] = item
     return ratios

@@ -9,3 +9,4 @@ pandas
 pillow
 tenacity
 tabulate
+dataframe_image

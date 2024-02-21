@@ -3,10 +3,8 @@ import re
 import os
 import pandas as pd
 import warnings
-import matplotlib.pyplot as plt
 import dataframe_image as dfi
 from PIL import Image, ImageDraw, ImageFont
-from tenacity import retry, wait_random_exponential, stop_after_attempt
 
 import google.generativeai as genai
 from telegram import ChatAction

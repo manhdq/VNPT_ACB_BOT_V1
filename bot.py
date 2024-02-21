@@ -13,7 +13,7 @@ from helper import check_organ, initialize_knowledges, \
 RETRIEVAL_API_ENDPOINT = "http://10.159.19.19:30814/search"
 RETRIEVAL_BOT_ID = "9b5f31a0-cfc8-11ee-b261-e75ac6d5ebdf"
 RETRIEVAL_TOP_N_RETRIEVAL = "50"
-RETRIEVAL_TOP_N_RERANKING = "5"
+RETRIEVAL_TOP_N_RERANKING = "10"
 RETRIEVAL_RANK = "0"
 
 P_TIMEZONE = pytz.timezone(config.TIMEZONE)
@@ -26,6 +26,7 @@ bot = telebot.TeleBot(config.TOKEN)
 # Create a ACB Assistant
 acb_assistant = ACBAssistant()
 
+NUM_BUTTON_SHOW = 3  # Number of buttons options
 recommend_tickers = [
     "CTCP Bán lẻ Kỹ thuật số FPT (FRT)",
     "CTCP Vàng bạc Đá quý Phú Nhuận (PNJ)",
@@ -58,7 +59,7 @@ def start_command(message):
     chat_id = message.chat.id
     # Recommend some tickers for user
     keyboard = telebot.types.InlineKeyboardMarkup()
-    for ticker in recommend_tickers:
+    for ticker in recommend_tickers[:NUM_BUTTON_SHOW]:
         keyboard.row(telebot.types.InlineKeyboardButton(ticker, callback_data=f"get-{ticker.split()[-1].strip()[1:-1]}"))
     
     telebot_send_message(bot, chat_id,
@@ -114,7 +115,7 @@ def handle_text_input(message):
         result = check_organ(text.strip(), recommend_tickers_short)
         if result is None:
             keyboard = telebot.types.InlineKeyboardMarkup()
-            for ticker in recommend_tickers:
+            for ticker in recommend_tickers[:NUM_BUTTON_SHOW]:
                 keyboard.row(telebot.types.InlineKeyboardButton(ticker, callback_data=f"get-{ticker.split()[-1].strip()[1:-1]}"))
             telebot_send_message(bot, chat_id,
                          f"""Xin lỗi, tôi chưa có thông tin về doanh nghiệp **{text.strip()}** trong cơ sở dữ liệu của mình. Bạn có muốn tìm hiểu về doanh nghiệp nào khác không?""",
@@ -154,7 +155,8 @@ def handle_text_input(message):
         # with open("retrieval_response.json", "r") as f:
         #     retrieval_response = json.load(f)["knowledge_retrieval"]
 
-        answer = acb_assistant.request_answer(text, retrieval_response, use_base_knowledges=False)
+        answer = acb_assistant.request_answer(text, retrieval_response, 
+                                              passage_thres=0.0, use_base_knowledges=False)
         telebot_send_message(bot, chat_id, answer)
 
 
