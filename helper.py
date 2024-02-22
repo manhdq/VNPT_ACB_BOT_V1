@@ -80,8 +80,6 @@ def initialize_knowledges(bot, chat_id, ticker, organ_name):
     answer = generate_answer_1(ticker)
     telebot_send_message(bot, chat_id,
                          answer)
-    # base_knowledges_dict["Q1"] = question_list[0]
-    # base_knowledges_dict["A1"] = answer
     base_knowledges_dict[question_list[0].format(ticker, organ_name)] = answer
 
     # QA 2
@@ -91,8 +89,6 @@ def initialize_knowledges(bot, chat_id, ticker, organ_name):
     answer = generate_answer_2(ticker)
     telebot_send_message(bot, chat_id,
                          answer)
-    # base_knowledges_dict["Q2"] = question_list[1]
-    # base_knowledges_dict["A2"] = answer
     base_knowledges_dict[question_list[1].format(ticker, organ_name, industry)] = answer
 
     # QA 3
@@ -102,13 +98,7 @@ def initialize_knowledges(bot, chat_id, ticker, organ_name):
     answer = generate_answer_3(ticker)
     telebot_send_message(bot, chat_id,
                          answer)
-    # base_knowledges_dict["Q3"] = question_list[2]
-    # base_knowledges_dict["A3"] = answer
     base_knowledges_dict[question_list[2].format(ticker, organ_name)] = answer
-
-    # # Save to cache (for debug purpose)  ##TODO: Delete this
-    # with open("cache_kl_base.json", "w") as f:
-    #     json.dump(base_knowledges_dict, f, indent=4)
 
     return base_knowledges_dict
 
