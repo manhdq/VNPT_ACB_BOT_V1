@@ -68,7 +68,7 @@ def start_command(message):
 2. CTCP Vàng bạc Đá quý Phú Nhuận (PNJ)
 3. CTCP Đầu tư Thế giới Di động (MWG)
 4. CTCP G-Automobile (GMA)
-5. CTCP City Auto (CAV)
+5. CTCP City Auto (CTF)
 6. CTCP Cảng Sài Gòn (SGC)
 7. CTCP Cảng Đồng Nai (PDN)
 8. CTCP Gemadept (GMD)
