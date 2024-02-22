@@ -1,6 +1,7 @@
 import markdown2
 import re
 import os
+import numpy as np
 import pandas as pd
 import warnings
 import dataframe_image as dfi
@@ -272,52 +273,108 @@ def reformat_table(text):
 def convert_to_html(text):
     html_text = markdown2.markdown(text)
     html_text = html_text.replace('<p>', '').replace('</p>', '')
-    html_text = html_text.replace('<ul>\n', '').replace('</ul>\n', '')
+    html_text = html_text.replace('<ul>\n', '').replace('</ul>\n', '').replace('</ul>', '')
     html_text = html_text.replace('<li>', '• ').replace('</li>', '')
-    html_text = html_text.replace('<ol>\n', '• ').replace('</ol>\n', '')
+    html_text = html_text.replace('<ol>\n', '• ').replace('</ol>\n', '').replace('</ol>', '')
     # Convert all table for better visual
     html_text, num_table = reformat_table(html_text)
     return html_text, num_table
 
 
-def telebot_send_message(bot, chat_id, message, reply_markup=None):
-    # First convert to HTML format
-    html_message, num_table = convert_to_html(message)
+def breakdown_message_by_endline(message, message_max_length):
+    ##TODO: Not necessary for now
+    return [message]
 
-    if reply_markup is not None:
-        try:
-            bot.send_message(
-                chat_id,
-                html_message,
-                parse_mode="HTML",
-                reply_markup=reply_markup
-            )
-        except:
-            bot.send_message(
-                chat_id,
-                message,
-                reply_markup=reply_markup
-            )
+
+def breakdown_message_by_header(message, message_max_length):
+    def find_header_with_indices(text):
+        # Define a regular expression pattern for identifying tables
+        table_pattern = re.compile(r'\*\*.*\*\*')
+
+        # Find all matches in the text along with their starting indices
+        matches = [(match.group(), match.start()) for match in table_pattern.finditer(text)]
+
+        return matches
+    
+    len_msg = len(message)
+    num_parts = np.ceil(len_msg / message_max_length)
+    avg_words_per_part = len_msg // num_parts  # for scale all parts after splitation
+
+    subparts = []; header_ids = []
+    headers_found_with_indices = find_header_with_indices(message)
+    for _, start_index in headers_found_with_indices:
+        header_ids.append(start_index)
+
+    # Get subparts, each subpart start with one header
+    if len(header_ids) == 0 or len(header_ids) == 1:
+        subparts = [message]
     else:
-        try:
-            bot.send_message(
-                chat_id,
-                html_message,
-                parse_mode="HTML"
-            )
-        except:
-            print(html_message)
-            bot.send_message(
-                chat_id,
-                message
-            )
-    if num_table:
-        for i in range(num_table):
-            with open(f"cache/table_{i}.jpg", "rb") as photo:
-                bot.send_photo(
+        if header_ids[0] > 1:
+            # If start index of first header != 0, get first subpart
+            subparts.append(message[:header_ids[0] - 1])
+        for i in range(len(header_ids) - 1):
+            subparts.append(message[header_ids[i]: header_ids[i+1]])
+
+    parts_by_header = []
+    part_by_header = ""
+    for subpart in subparts:
+        if len(part_by_header + subpart) > avg_words_per_part:
+            parts_by_header.append(part_by_header)
+            part_by_header = subpart
+        else:
+            part_by_header += subpart
+    parts_by_header.append(part_by_header)  # append the last one
+
+    results = []
+    for part_by_header in parts_by_header:
+        parts = breakdown_message_by_endline(part_by_header, message_max_length)
+        results.extend(parts)
+
+    return results
+
+
+def telebot_send_message(bot, chat_id, message, reply_markup=None, message_max_length = 4096):
+    message_list = breakdown_message_by_header(message, message_max_length)
+    num_messages = len(message_list)
+    for i, message in enumerate(message_list):
+        # print(len(message))
+        # First convert to HTML format
+        html_message, num_table = convert_to_html(message)
+
+        if reply_markup is not None and i==num_messages-1:
+            try:
+                bot.send_message(
                     chat_id,
-                    photo
+                    html_message,
+                    parse_mode="HTML",
+                    reply_markup=reply_markup
                 )
+            except:
+                bot.send_message(
+                    chat_id,
+                    message,
+                    reply_markup=reply_markup
+                )
+        else:
+            try:
+                bot.send_message(
+                    chat_id,
+                    html_message,
+                    parse_mode="HTML"
+                )
+            except:
+                # print(html_message)
+                bot.send_message(
+                    chat_id,
+                    message
+                )
+        if num_table:
+            for i in range(num_table):
+                with open(f"cache/table_{i}.jpg", "rb") as photo:
+                    bot.send_photo(
+                        chat_id,
+                        photo
+                    )
 
 
 class ACBAssistant:
