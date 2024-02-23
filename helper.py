@@ -6,6 +6,7 @@ import pandas as pd
 import warnings
 import dataframe_image as dfi
 from PIL import Image, ImageDraw, ImageFont
+from tenacity import retry, wait_random_exponential, stop_after_attempt
 
 import google.generativeai as genai
 from telegram import ChatAction
@@ -28,9 +29,13 @@ model = genai.GenerativeModel('gemini-pro', generation_config=generation_config)
 passage_cache = ""  # Save time when generate answer 2 and 3
 
 
-# @retry(wait=wait_random_exponential(min=1, max=40), stop=stop_after_attempt(3))
-def get_completion(prompt):
-    return model.generate_content(prompt)
+@retry(wait=wait_random_exponential(min=1, max=40), stop=stop_after_attempt(3))
+def get_completion_text(prompt, temperature=0.1):
+    
+    return model.generate_content(prompt,
+                                  generation_config=genai.types.GenerationConfig(
+                                        temperature=temperature
+                                    )).text
 
 
 df_list = listing_companies()
@@ -131,9 +136,9 @@ def generate_answer_1(ticker):
 
     Thông tin doanh nghiệp:
     {passage}"""
-    response = get_completion(prompt)
+    response_text = get_completion_text(prompt)
 
-    return response.text
+    return response_text
 
 
 ##### Question 2: Đánh giá tình hình kinh doanh của công ty trong 3 năm gần đây và so sánh với trung bình các công ty trong ngành. #####
@@ -152,9 +157,9 @@ Yêu cầu báo cáo chuyên nghiệp và chi tiết, làm cơ sở để hỗ t
 
     Thông tin doanh nghiệp:
     {passage_cache}"""
-    response = get_completion(prompt)
+    response_text = get_completion_text(prompt)
 
-    return response.text
+    return response_text
 
 
 ##### Question 3: Đánh giá mức độ phù hợp của doanh nghiệp so với điều kiện cấp tín dụng của ACB. #####
@@ -185,11 +190,45 @@ Thông tin doanh nghiệp:
 
 {ACB_CRITERIA}
 """
-    response = get_completion(prompt)
+    response_text = get_completion_text(prompt)
 
     passage_cache = ""  # Naive reset
 
-    return response.text
+    return response_text
+
+
+# Setup auto responses from chatbot for greetings, apologizes, follow-up ques
+def generate_greeting():
+    PROMPT = """Bạn là VNPT FinAssist, một trợ lý ảo chuyên nghiệp chuyên cung cấp giải pháp toàn diện cho việc đánh giá và cấp tín dụng doanh nghiệp. Bạn đang hỗ trợ phân tích các doanh nghiệp sau:
+1. CTCP Bán lẻ Kỹ thuật số FPT (FRT)
+2. CTCP Vàng bạc Đá quý Phú Nhuận (PNJ)
+3. CTCP Đầu tư Thế giới Di động (MWG)
+4. CTCP G-Automobile (GMA)
+5. CTCP City Auto (CTF)
+6. CTCP Cảng Sài Gòn (SGC)
+7. CTCP Cảng Đồng Nai (PDN)
+8. CTCP Gemadept (GMD)
+9. CTCP Cảng Cát Lái (CLL)
+10. CTCP Vận tải và Xếp dỡ Hải An (HAH)
+Một cách ngắn gọn, hãy gửi lời chào ban đầu tới người dùng và hỏi người dùng lựa chọn doanh nghiệp để nhờ hỗ trợ."""
+    response_text = get_completion_text(PROMPT, temperature=0.8)
+    return response_text
+
+def generate_apology(ticker):
+    PROMPT = """Bạn là VNPT FinAssist, một trợ lý ảo chuyên nghiệp chuyên cung cấp giải pháp toàn diện cho việc đánh giá và cấp tín dụng doanh nghiệp. Bạn đang hỗ trợ phân tích các doanh nghiệp sau:
+1. CTCP Bán lẻ Kỹ thuật số FPT (FRT)
+2. CTCP Vàng bạc Đá quý Phú Nhuận (PNJ)
+3. CTCP Đầu tư Thế giới Di động (MWG)
+4. CTCP G-Automobile (GMA)
+5. CTCP City Auto (CTF)
+6. CTCP Cảng Sài Gòn (SGC)
+7. CTCP Cảng Đồng Nai (PDN)
+8. CTCP Gemadept (GMD)
+9. CTCP Cảng Cát Lái (CLL)
+10. CTCP Vận tải và Xếp dỡ Hải An (HAH)
+Giả sử có người dùng hỏi bạn thông tin về doanh nghiệp, công ty có tên **{}** (có thể là một cái tên bất kì được in đậm) không thuộc phạm vi hỗ trợ của bạn, hãy xin lỗi và gợi ý lựa chọn doanh nghiệp mà bạn hỗ trợ một cách khéo léo"""
+    response_text = get_completion_text(PROMPT.format(ticker), temperature=0.8)
+    return response_text
 
 
 def table_to_image(table_str, index=0):
@@ -272,10 +311,28 @@ def reformat_table(text):
 
 def convert_to_html(text):
     html_text = markdown2.markdown(text)
+    
+    def reserve_digit_index(html_text):
+        # Define the pattern using regex
+        pattern = re.compile(r'<ol>.*?</ol>', re.DOTALL)
+        # Find all matches with start and end indices
+        matches = [(match.group(), match.start(), match.end()) for match in pattern.finditer(html_text)]
+        for match, start_index, end_index in matches[::-1]:  # Up side down
+            index = 1
+            new_sub_text_parts = []
+            sub_text_parts = match.strip().split("\n")[1:-1]  ## Eliminate <ol> and </ol>
+            for part in sub_text_parts:
+                if part[:4] == "<li>" and part[-5:] == "</li>":
+                    new_sub_text_parts.append(f"{index}. {part[5:-5]}")
+                    index += 1
+            html_text = html_text[:start_index] + "\n".join(new_sub_text_parts) + html_text[end_index:]
+        return html_text
+    
+    html_text = reserve_digit_index(html_text)
     html_text = html_text.replace('<p>', '').replace('</p>', '')
     html_text = html_text.replace('<ul>\n', '').replace('</ul>\n', '').replace('</ul>', '')
     html_text = html_text.replace('<li>', '• ').replace('</li>', '')
-    html_text = html_text.replace('<ol>\n', '• ').replace('</ol>\n', '').replace('</ol>', '')
+    html_text = html_text.replace('<ol>\n', '').replace('</ol>\n', '').replace('</ol>', '')
     # Convert all table for better visual
     html_text, num_table = reformat_table(html_text)
     return html_text, num_table

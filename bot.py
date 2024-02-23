@@ -4,9 +4,11 @@ import config
 import requests
 import json
 import pytz
+from telegram import ChatAction
 
 from helper import check_organ, initialize_knowledges, \
-                telebot_send_message, ACBAssistant
+                telebot_send_message, ACBAssistant, \
+                generate_greeting, generate_apology
 
 
 # Retrieval options  ##TODO: Dynamic this
@@ -62,19 +64,9 @@ def start_command(message):
     for ticker in recommend_tickers[:NUM_BUTTON_SHOW]:
         keyboard.row(telebot.types.InlineKeyboardButton(ticker, callback_data=f"get-{ticker.split()[-1].strip()[1:-1]}"))
     
+    bot.send_chat_action(chat_id, action=ChatAction.TYPING)
     telebot_send_message(bot, chat_id,
-                         """Xin chào! Tôi là VNPT FinAssist, trợ lý ảo chuyên cung cấp giải pháp toàn diện cho việc đánh giá và cấp tín dụng doanh nghiệp. Hiện tại, VNPT FinAssist đang hỗ trợ phân tích các doanh nghiệp sau:
-1. CTCP Bán lẻ Kỹ thuật số FPT (FRT)
-2. CTCP Vàng bạc Đá quý Phú Nhuận (PNJ)
-3. CTCP Đầu tư Thế giới Di động (MWG)
-4. CTCP G-Automobile (GMA)
-5. CTCP City Auto (CTF)
-6. CTCP Cảng Sài Gòn (SGC)
-7. CTCP Cảng Đồng Nai (PDN)
-8. CTCP Gemadept (GMD)
-9. CTCP Cảng Cát Lái (CLL)
-10. CTCP Vận tải và Xếp dỡ Hải An (HAH)
-Hãy nhập mã ticker doanh nghiệp bạn muốn tìm hiểu để tôi có thể hỗ trợ bạn ngay nhé!""",
+                         generate_greeting(),
                          reply_markup=keyboard)
 
 # Click handler
@@ -117,9 +109,10 @@ def handle_text_input(message):
             keyboard = telebot.types.InlineKeyboardMarkup()
             for ticker in recommend_tickers[:NUM_BUTTON_SHOW]:
                 keyboard.row(telebot.types.InlineKeyboardButton(ticker, callback_data=f"get-{ticker.split()[-1].strip()[1:-1]}"))
+            bot.send_chat_action(chat_id, action=ChatAction.TYPING)
             telebot_send_message(bot, chat_id,
-                         f"""Xin lỗi, tôi chưa có thông tin về doanh nghiệp **{text.strip()}** trong cơ sở dữ liệu của mình. Bạn có muốn tìm hiểu về doanh nghiệp nào khác không?""",
-                         reply_markup=keyboard)
+                                f"""Xin lỗi, tôi chưa có thông tin về doanh nghiệp **{text.strip()}** trong cơ sở dữ liệu của mình. Bạn có muốn tìm hiểu về doanh nghiệp nào khác không?""",
+                                reply_markup=keyboard)
             return
         else:
             ticker, organ_name, organ_short_name = result

@@ -1,6 +1,7 @@
 import time
 import numpy as np
 from datetime import datetime
+from tenacity import retry, wait_random_exponential, stop_after_attempt
 
 from vnstock import * #import all functions
 
@@ -214,6 +215,7 @@ def parse_ticker_ratios(ticker):
     )
     return passage
 
+@retry(wait=wait_random_exponential(min=1, max=40), stop=stop_after_attempt(3))
 def parse_industry_ratios(ticker):
     industry_ratios = extract_industry_ratios(ticker)
     # print(ticker)
